@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import os
+import pyclipper
 
 class ContourEditor:
     def __init__(self, image_path):
@@ -7,6 +9,7 @@ class ContourEditor:
         self.template_color = cv2.cvtColor(self.template_gray, cv2.COLOR_GRAY2BGR)
         _, self.template_edges = cv2.threshold(self.template_gray, 90, 255, cv2.THRESH_BINARY)
         self.contours_template, _ = cv2.findContours(self.template_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
         self.min_perimeter = 100
         self.contours_template = [cv2.approxPolyDP(cnt, epsilon=8, closed=True) for cnt in self.contours_template if cv2.arcLength(cnt, closed=True) > self.min_perimeter]
         print(f'Số lượng contours sau khi lọc: {len(self.contours_template)}')
@@ -38,6 +41,18 @@ class ContourEditor:
             new_y = int(cy + scale_factor * (py - cy))
             contour_scaled.append([[new_x, new_y]])
         return np.array(contour_scaled, dtype=np.int32)
+    
+    def contour_offset(self,contour,offset=-5):
+        contour = tuple(map(tuple,editor.selected_contour.reshape(editor.selected_contour.shape[0],2)))
+        pco = pyclipper.PyclipperOffset()
+        pco.AddPath(contour, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        solution = pco.Execute(offset)[0]
+        offsetted_contour = []
+        for point in solution:
+            offsetted_contour.append([point])
+        return np.array(offsetted_contour,dtype=np.int32)
+        
+
 
     def update_display(self):
         display = self.template_color.copy()
@@ -62,13 +77,15 @@ class ContourEditor:
                 for cnt in self.contours_template:
                     if cv2.pointPolygonTest(cnt, (x, y), False) >= 0:
                         self.selected_contour = cnt
-                        self.contour_inner = self.shrink_contour(cnt, self.scale_factor)  # Tạo contour nhỏ hơn
+                        # self.contour_inner = self.shrink_contour(cnt, self.scale_factor)  # Tạo contour nhỏ hơn
+                        self.contour_inner = self.contour_offset(cnt,-40)
                         self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=8, closed=True)
                         self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
                         print(self.contour_inner[:,:,0:2])
                         self.contour_selected = True
                         print("Contour đã chọn!")
                         break
+                    
             if self.selected_contour is not None:
                 for i, point in enumerate(self.selected_contour):
                     px, py = point[0]
@@ -128,7 +145,12 @@ class ContourEditor:
         cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    editor = ContourEditor('/home/vinhdq/I&C_PROJECT/image/captured_image.png')
+    # home_path = r'D:\python\I & C\Vision guide robot\I&C_PROJECT'
+    home_path = os.path.join(os.getcwd(),'I&C_PROJECT')
+    image_path = os.path.join(home_path,r'image\captured_image.png')
+    # editor = ContourEditor('/home/vinhdq/I&C_PROJECT/image/captured_image.png')
+    editor = ContourEditor(image_path)
     editor.run()
-    np.save('/home/vinhdq/I&C_PROJECT/temp_contour/selected_contour.npy', editor.selected_contour)
-    np.save('/home/vinhdq/I&C_PROJECT/temp_contour/contour_inner.npy', editor.contour_inner)
+    np.save(os.path.join(home_path,r'temp_contour\selected_contour.npy'), editor.selected_contour)
+    np.save(os.path.join(home_path,r'temp_contour\contour_inner.npy'), editor.contour_inner)
+    # print("Contour",tuple(map(tuple,editor.selected_contour.reshape(editor.selected_contour.shape[0],2))))
