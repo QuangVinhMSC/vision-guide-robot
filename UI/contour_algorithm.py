@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import pyclipper
 
 class ContourProcessor:
     def __init__(self, image_path):
@@ -30,3 +31,13 @@ class ContourProcessor:
             new_contour.append([[int(x_new), int(y_new)]])
 
         return np.array(new_contour, dtype=np.int32)
+    def contour_offset(self,contour,offset):
+        contour = tuple(map(tuple,contour.reshape(contour.shape[0],2)))
+        pco = pyclipper.PyclipperOffset()
+        pco.AddPath(contour, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+        solution = pco.Execute(offset)[0]
+        offsetted_contour = []
+        for point in solution:
+            offsetted_contour.append([point])
+        return np.array(offsetted_contour,dtype=np.int32)
+        

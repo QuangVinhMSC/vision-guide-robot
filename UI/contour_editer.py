@@ -37,9 +37,9 @@ class ContourEditor(QWidget):
         self.btn_reset.clicked.connect(self.reset_selection)
 
         self.slider_scale = QSlider(Qt.Horizontal)
-        self.slider_scale.setMinimum(50)
+        self.slider_scale.setMinimum(-150)
         self.slider_scale.setMaximum(150)
-        self.slider_scale.setValue(80)
+        self.slider_scale.setValue(0)
         self.slider_scale.setTickInterval(10)
         self.slider_scale.setTickPosition(QSlider.TicksBelow)
         self.slider_scale.valueChanged.connect(self.update_scale)
@@ -90,10 +90,11 @@ class ContourEditor(QWidget):
 
     def update_scale(self, value):
         """ Cập nhật scale factor khi kéo thanh trượt """
-        self.scale_factor = value / 100.0
+        self.scale_factor = value 
         print(f"Scale Factor: {self.scale_factor}")
         if self.selected_contour is not None:
-            self.contour_inner = self.processor.shrink_contour(self.selected_contour, self.scale_factor)
+            # self.contour_inner = self.processor.shrink_contour(self.selected_contour, self.scale_factor)
+            self.contour_inner = self.processor.contour_offset(self.selected_contour,-self.scale_factor)
             self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=8, closed=True)
             self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
         self.update_display()
@@ -113,7 +114,8 @@ class ContourEditor(QWidget):
                 for cnt in self.contours_template:
                     if cv2.pointPolygonTest(cnt, (x, y), False) >= 0:
                         self.selected_contour = cnt
-                        self.contour_inner = self.processor.shrink_contour(cnt, self.scale_factor)
+                        # self.contour_inner = self.processor.shrink_contour(cnt, self.scale_factor)
+                        self.contour_inner = self.processor.contour_offset(self.selected_contour,- self.scale_factor)
                         self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=8, closed=True)
                         self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
                         self.contour_selected = True
@@ -121,8 +123,6 @@ class ContourEditor(QWidget):
                         break
 
             self.update_display()
-
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     editor = ContourEditor("/home/vinhdq/vision guide robot/image/captured_image.png")
