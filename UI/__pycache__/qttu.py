@@ -51,69 +51,69 @@
 
 
 
-# import sys
+import sys
 
-# from PySide6.QtWidgets import (
-#     QApplication,
-#     QCheckBox,
-#     QComboBox,
-#     QDateEdit,
-#     QDateTimeEdit,
-#     QDial,
-#     QDoubleSpinBox,
-#     QFontComboBox,
-#     QLabel,
-#     QLCDNumber,
-#     QLineEdit,
-#     QMainWindow,
-#     QProgressBar,
-#     QPushButton,
-#     QRadioButton,
-#     QSlider,
-#     QSpinBox,
-#     QTimeEdit,
-#     QVBoxLayout,
-#     QWidget,
-# )
+from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
+    QDateTimeEdit,
+    QDial,
+    QDoubleSpinBox,
+    QFontComboBox,
+    QLabel,
+    QLCDNumber,
+    QLineEdit,
+    QMainWindow,
+    QProgressBar,
+    QPushButton,
+    QRadioButton,
+    QSlider,
+    QSpinBox,
+    QTimeEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
-# class MainWindow(QMainWindow):
-#     def __init__(self):
-#         super().__init__()
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
 
-#         self.setWindowTitle("Widgets App")
+        self.setWindowTitle("Widgets App")
 
-#         layout = QVBoxLayout()
-#         widgets = [
-#             QCheckBox,
-#             QComboBox,
-#             QDateEdit,
-#             QDateTimeEdit,
-#             QDial,
-#             QDoubleSpinBox,
-#             QFontComboBox,
-#             QLCDNumber,
-#             QLabel,
-#             QLineEdit,
-#             QProgressBar,
-#             QPushButton,
-#             QRadioButton,
-#             QSlider,
-#             QSpinBox,
-#             QTimeEdit,
-#         ]
+        layout = QVBoxLayout()
+        widgets = [
+            QCheckBox,
+            QComboBox,
+            QDateEdit,
+            QDateTimeEdit,
+            QDial,
+            QDoubleSpinBox,
+            QFontComboBox,
+            QLCDNumber,
+            QLabel,
+            QLineEdit,
+            QProgressBar,
+            QPushButton,
+            QRadioButton,
+            QSlider,
 
-#         for widget in widgets:
-#             layout.addWidget(widget())
+            QTimeEdit,
+        ]
 
-#         central_widget = QWidget()
-#         central_widget.setLayout(layout)
+        for widget in widgets:
+            layout.addWidget(widget())
 
-#         self.setCentralWidget(central_widget)
+        central_widget = QWidget()
+        central_widget.setLayout(layout)
 
-# app = QApplication(sys.argv)
-# window = MainWindow()
-# window.show()
-# app.exec()
+        self.setCentralWidget(central_widget)
+
+app = QApplication(sys.argv)
+window = MainWindow()
+window.show()
+app.exec()
 
 
 
@@ -156,46 +156,46 @@
 
 
 
-import sys
-from PySide6 import QtCore, QtGui, QtWidgets
-from PySide6.QtCore import Qt
+# import sys
+# from PySide6 import QtCore, QtGui, QtWidgets
+# from PySide6.QtCore import Qt
 
 
-class MainWindow(QtWidgets.QMainWindow):
+# class MainWindow(QtWidgets.QMainWindow):
 
-    def __init__(self):
-        super().__init__()
+#     def __init__(self):
+#         super().__init__()
 
-        self.label = QtWidgets.QLabel()
-        canvas = QtGui.QPixmap(400, 300)
-        canvas.fill(Qt.white)
-        self.label.setPixmap(canvas)
-        self.setCentralWidget(self.label)
+#         self.label = QtWidgets.QLabel()
+#         canvas = QtGui.QPixmap(400, 300)
+#         canvas.fill(Qt.white)
+#         self.label.setPixmap(canvas)
+#         self.setCentralWidget(self.label)
 
-        self.last_x, self.last_y = None, None
+#         self.last_x, self.last_y = None, None
 
-    def mouseMoveEvent(self, e):
-        if self.last_x is None: # First event.
-            self.last_x = e.x()
-            self.last_y = e.y()
-            return # Ignore the first time.
+#     def mouseMoveEvent(self, e):
+#         if self.last_x is None: # First event.
+#             self.last_x = e.x()
+#             self.last_y = e.y()
+#             return # Ignore the first time.
 
-        pixmap = self.label.pixmap()
-        painter = QtGui.QPainter(pixmap)
-        painter.drawLine(self.last_x, self.last_y, e.x(), e.y())
-        painter.end()
-        self.label.setPixmap(pixmap)
+#         pixmap = self.label.pixmap()
+#         painter = QtGui.QPainter(pixmap)
+#         painter.drawLine(self.last_x, self.last_y, e.x(), e.y())
+#         painter.end()
+#         self.label.setPixmap(pixmap)
 
-        # Update the origin for next time.
-        self.last_x = e.x()
-        self.last_y = e.y()
+#         # Update the origin for next time.
+#         self.last_x = e.x()
+#         self.last_y = e.y()
 
-    def mouseReleaseEvent(self, e):
-        self.last_x = None
-        self.last_y = None
+#     def mouseReleaseEvent(self, e):
+#         self.last_x = None
+#         self.last_y = None
 
 
-app = QtWidgets.QApplication(sys.argv)
-window = MainWindow()
-window.show()
-app.exec()
+# app = QtWidgets.QApplication(sys.argv)
+# window = MainWindow()
+# window.show()
+# app.exec()

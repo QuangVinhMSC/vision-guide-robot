@@ -12,8 +12,9 @@ class ContourProcessor:
     def threshol_editor(self, threshol=(90,150)):
         _, self.template_edges = cv2.threshold(self.template_gray, threshol[0], threshol[1], cv2.THRESH_BINARY)
         self.contours_template_raw, _ = cv2.findContours(self.template_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)      
+        print(len(self.contours_template_raw))
         self.min_perimeter = 100
-        self.contours_template = [cv2.approxPolyDP(cnt, epsilon=1, closed=True) for cnt in self.contours_template_raw
+        self.contours_template = [cv2.approxPolyDP(cnt, epsilon=self.epsilon, closed=True) for cnt in self.contours_template_raw
                                   if cv2.arcLength(cnt, closed=True) > self.min_perimeter]
     def shrink_contour(self, contour, scale):
         """ Tạo contour nhỏ hơn dựa trên scale factor """

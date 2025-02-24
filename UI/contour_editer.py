@@ -27,11 +27,15 @@ class ContourEditor(QWidget):
         self.mask = []
         self.temp_masked_points = []  # Danh sách tạm thời các điểm bị bôi đen
         self.final_contour = []  # Danh sách các điểm đã được lưu
+        self.final_contour_3d = []
 
         # Label Widget
         self.label = QLabel(self)
         self.label.setScaledContents(True)
-
+        self.ruler = QLabel("Ruler")
+        self.ruler_x = QLabel("0")
+        self.ruler_y = QLabel("0")
+        self.ruler_diag = QLabel("0")
         # Frame Widget
         self.control_panel = QFrame(self)
         self.control_panel.setFrameShape(QFrame.StyledPanel)
@@ -44,47 +48,84 @@ class ContourEditor(QWidget):
         self.btn_save.clicked.connect(self.save_points)
         self.btn_clear = QPushButton("Clear Saved")
         self.btn_clear.clicked.connect(self.clear_final_offset)
-        self.slider_scale = QSlider(Qt.Horizontal)
-        self.slider_scale.setMinimum(-150)
-        self.slider_scale.setMaximum(150)
-        self.slider_scale.setValue(0)
-        self.slider_scale.setTickInterval(10)
-        self.slider_scale.setTickPosition(QSlider.TicksBelow)
-        self.slider_scale.valueChanged.connect(self.update_scale_offset)
+        self.slider_scale_offset = QSlider(Qt.Horizontal)
+        self.slider_scale_offset.setMinimum(-150)
+        self.slider_scale_offset.setMaximum(150)
+        self.slider_scale_offset.setTickInterval(10)
+        self.slider_scale_offset.setTickPosition(QSlider.TicksBelow)
+        self.slider_scale_offset.valueChanged.connect(self.update_scale_offset)
+        self.offsetbox = QSpinBox()
         self.slider_scale_thresh = QSlider(Qt.Horizontal)
         self.slider_scale_thresh.setMinimum(0)
         self.slider_scale_thresh.setMaximum(255)
-        self.slider_scale_thresh.setValue(90)
         self.slider_scale_thresh.setTickInterval(10)
         self.slider_scale_thresh.setTickPosition(QSlider.TicksBelow)
         self.slider_scale_thresh.valueChanged.connect(self.update_scale_threshol)
         self.slider_scale_epsilon = QSlider(Qt.Horizontal)
         self.slider_scale_epsilon.setMinimum(1)
         self.slider_scale_epsilon.setMaximum(10)
-        self.slider_scale_epsilon.setValue(1)
         self.slider_scale_epsilon.setTickInterval(1)
         self.slider_scale_epsilon.setTickPosition(QSlider.TicksBelow)
         self.slider_scale_epsilon.valueChanged.connect(self.update_scale_epsilon)
-        self.n_input = QSpinBox()
-        self.n_input.setMinimum(0)
-        self.m_input = QSpinBox()
-        self.m_input.setMinimum(0)
+        self.threshol_box = QSpinBox()
+        self.threshol_box.setRange(0, 255)
+        self.offset_box = QSpinBox()
+        self.offset_box.setRange(-150, 150)
+        self.epsilon_box = QSpinBox()
+        self.epsilon_box.setRange(1, 10)
+        self.point_box = QSpinBox()
+        self.point_box.setRange(0,0)
+        self.point_box.valueChanged.connect(self.select_point2edit)
+        self.zedit_box = QSpinBox()
+        self.zedit_box.setRange(-100,100)
+        self.zedit_box.valueChanged.connect(self.z_editor)
 
-        # Layout
+
+        #connect value
+        self.slider_scale_thresh.valueChanged.connect(self.threshol_box.setValue)
+        self.threshol_box.valueChanged.connect(self.slider_scale_thresh.setValue)
+        self.slider_scale_offset.valueChanged.connect(self.offset_box.setValue)
+        self.offset_box.valueChanged.connect(self.slider_scale_offset.setValue)
+        self.slider_scale_epsilon.valueChanged.connect(self.epsilon_box.setValue)
+        self.epsilon_box.valueChanged.connect(self.slider_scale_epsilon.setValue)
+        #pre-setvalue
+        self.slider_scale_thresh.setValue(90)
+        self.slider_scale_offset.setValue(0)
+        self.slider_scale_epsilon.setValue(1)
+
+        # Small Layout
+        threshol_layout = QHBoxLayout()#
+        threshol_layout.addWidget(self.slider_scale_thresh)
+        threshol_layout.addWidget(self.threshol_box)
+        offset_layout = QHBoxLayout()#
+        offset_layout.addWidget(self.slider_scale_offset)
+        offset_layout.addWidget(self.offset_box)
+        epsilon_layout = QHBoxLayout()#
+        epsilon_layout.addWidget(self.slider_scale_epsilon)
+        epsilon_layout.addWidget(self.epsilon_box)
+        ruler_layout = QHBoxLayout()
+        ruler_layout.addWidget(self.ruler)
+        ruler_layout.addWidget(self.ruler_x)
+        ruler_layout.addWidget(self.ruler_y)
+        ruler_layout.addWidget(self.ruler_diag)
+        z_editor = QHBoxLayout()
+        z_editor.addWidget(self.point_box)
+        z_editor.addWidget(self.zedit_box)
+        #Panel Layout
         control_layout = QVBoxLayout()
-        control_layout.addWidget(self.slider_scale_thresh)
-        control_layout.addWidget(self.slider_scale)
-        control_layout.addWidget(self.slider_scale_epsilon)
+        control_layout.addLayout(threshol_layout)
+        control_layout.addLayout(offset_layout)
+        control_layout.addLayout(epsilon_layout)
         control_layout.addWidget(self.btn_reset)
-        control_layout.addWidget(self.n_input)
-        control_layout.addWidget(self.m_input)
         control_layout.addWidget(self.btn_save)
         control_layout.addWidget(self.btn_clear)
+        control_layout.addLayout(ruler_layout)
+        control_layout.addLayout(z_editor)
         control_layout.addStretch()
         self.control_panel.setLayout(control_layout)
 
         main_layout = QHBoxLayout()
-        main_layout.addWidget(self.label, 2)
+        main_layout.addWidget(self.label)
         main_layout.addWidget(self.control_panel, 1)
 
         self.setLayout(main_layout)
@@ -97,6 +138,10 @@ class ContourEditor(QWidget):
         self.draw_inner_contour(display)
         self.draw_final_offset(display)
         self.draw_final_contour(display)  # Vẽ final_contour lên giao diện
+        try:
+            self.draw_point(display)
+        except:
+            pass
         q_img = self.convert_cv_image_to_qimage(display)
         self.pixmap = QPixmap.fromImage(q_img)
         self.draw_rectangles_on_pixmap()
@@ -119,10 +164,21 @@ class ContourEditor(QWidget):
             self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
             # self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
         self.update_display()
+    def draw_point(self,display):
+        x, y = self.final_contour[self.point_box.value()]
+        cv2.circle(display, (x, y), 8, (100, 0, 255), -1)  # Màu khác để phân biệt
     def draw_contours(self, display):
         """Vẽ các contour lên hình ảnh."""
-        cv2.drawContours(display, self.contours_template, -1, (255,255, 0), 1)
-
+        cv2.drawContours(display, self.contours_template, -1, (255,255, 0), 3)
+    def select_point2edit(self):
+        self.zedit_box.setValue(self.final_contour_3d[self.point_box.value()][2])
+        self.update_display()
+    def z_editor(self):
+        try:
+            self.final_contour_3d[self.point_box.value()][2] = self.zedit_box.value()
+            print(self.final_contour_3d[self.point_box.value()])
+        except:
+            pass
     def draw_inner_contour(self, display):
         """Vẽ inner contour lên hình ảnh."""
         if self.contour_inner is not None:
@@ -137,7 +193,7 @@ class ContourEditor(QWidget):
         if self.final_offset:
             for i, point in enumerate(self.final_offset):
                 x, y = point
-                cv2.circle(display, (x, y), 3, (0, 255, 0), -1)
+                cv2.circle(display, (x, y), 3, (0, 0, 0), -1)
                 cv2.putText(display, str(i), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
             if len(self.final_offset) > 1:
                 cv2.polylines(display, [np.array(self.final_offset)], isClosed=False, color=(0, 255, 0), thickness=2)
@@ -147,10 +203,10 @@ class ContourEditor(QWidget):
         if self.final_contour:
             for i, point in enumerate(self.final_contour):
                 x, y = point
-                cv2.circle(display, (x, y), 3, (255, 0, 255), -1)  # Màu khác để phân biệt
-                cv2.putText(display, str(i), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1, cv2.LINE_AA)
+                cv2.circle(display, (x, y), 3, (0, 0, 0), -1)  # Màu khác để phân biệt
+                cv2.putText(display, str(i), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 3, cv2.LINE_AA)
             if len(self.final_contour) > 1:
-                cv2.polylines(display, [np.array(self.final_contour)], isClosed=False, color=(255, 0, 255), thickness=2)
+                cv2.polylines(display, [np.array(self.final_contour)], isClosed=False, color=(0, 0, 0), thickness=2)
 
     def convert_cv_image_to_qimage(self, display):
         """Chuyển đổi hình ảnh OpenCV sang QImage."""
@@ -181,13 +237,19 @@ class ContourEditor(QWidget):
         if self.contour_inner is not None:
             # Thêm các điểm tạm thời bị bôi đen vào final_contour
             self.final_contour.extend(self.temp_masked_points)
+            self.final_contour_3d.extend([[x, y, 0] for x, y in self.temp_masked_points])
+            
             self.temp_masked_points = []  # Xóa danh sách tạm thời
+            self.point_box.setRange(0,len(self.final_contour)-1)
+            
             self.update_display()
 
     def clear_final_offset(self):
         """Xóa các điểm đã lưu."""
         self.final_offset = []
         self.final_contour = []
+        self.final_contour_3d = []
+        self.point_box.setRange(0,len(self.final_contour))
         self.update_display()
 
     def mouseDoubleClickEvent(self, event):
@@ -210,7 +272,6 @@ class ContourEditor(QWidget):
                         self.contour_selected = True
                         break
             self.update_display()
-
     def mousePressEvent(self, event):
         """Xử lý sự kiện nhấn chuột."""
         self.start_pos = event.position().toPoint()
@@ -227,11 +288,11 @@ class ContourEditor(QWidget):
         """Xử lý sự kiện thả chuột."""
         if self.start_pos:
             self.end_pos = event.position().toPoint()
-            self.add_mask_region(self.start_pos, self.end_pos)
+            self.add_mask_region()
             self.start_pos = None
             self.update()
 
-    def add_mask_region(self, start, end):
+    def add_mask_region(self):
         """Lưu danh sách điểm nằm trong vùng bôi đen."""
         label_width = self.label.width()
         label_height = self.label.height()
@@ -249,7 +310,9 @@ class ContourEditor(QWidget):
         y1 = min(max(start_y, 0), max(end_y, 0))
         x2 = max(min(start_x, self.template_color.shape[1]), min(end_x, self.template_color.shape[1]))
         y2 = max(min(start_y, self.template_color.shape[0]), min(end_y, self.template_color.shape[0]))
-
+        self.ruler_x.setText(f"{abs(x1-x2)}")
+        self.ruler_y.setText(f"{abs(y1-y2)}")
+        self.ruler_diag.setText(f"{int(np.sqrt((x1-x2)**2+(y1-y2)**2))}")
         # Kiểm tra các điểm trong contour_inner có nằm trong vùng bôi đen không
         if self.contour_inner is not None:
             print(self.contour_inner.shape)
