@@ -14,7 +14,6 @@ class ContourEditor(QWidget):
         self.processor = ContourProcessor(image_path)
         self.template_color = self.processor.template_color
         self.contours_template = self.processor.contours_template
-
         # Variables
         self.start_pos = None
         self.end_pos = None
@@ -23,6 +22,7 @@ class ContourEditor(QWidget):
         self.selected_point_idx = None
         self.contour_selected = False
         self.scale_factor = 0.8
+        self.scale_epsilon = 1
         self.final_offset = []
         self.mask = []
         self.temp_masked_points = []  # Danh sách tạm thời các điểm bị bôi đen
@@ -50,7 +50,21 @@ class ContourEditor(QWidget):
         self.slider_scale.setValue(0)
         self.slider_scale.setTickInterval(10)
         self.slider_scale.setTickPosition(QSlider.TicksBelow)
-        self.slider_scale.valueChanged.connect(self.update_scale)
+        self.slider_scale.valueChanged.connect(self.update_scale_offset)
+        self.slider_scale_thresh = QSlider(Qt.Horizontal)
+        self.slider_scale_thresh.setMinimum(0)
+        self.slider_scale_thresh.setMaximum(255)
+        self.slider_scale_thresh.setValue(90)
+        self.slider_scale_thresh.setTickInterval(10)
+        self.slider_scale_thresh.setTickPosition(QSlider.TicksBelow)
+        self.slider_scale_thresh.valueChanged.connect(self.update_scale_threshol)
+        self.slider_scale_epsilon = QSlider(Qt.Horizontal)
+        self.slider_scale_epsilon.setMinimum(1)
+        self.slider_scale_epsilon.setMaximum(10)
+        self.slider_scale_epsilon.setValue(1)
+        self.slider_scale_epsilon.setTickInterval(1)
+        self.slider_scale_epsilon.setTickPosition(QSlider.TicksBelow)
+        self.slider_scale_epsilon.valueChanged.connect(self.update_scale_epsilon)
         self.n_input = QSpinBox()
         self.n_input.setMinimum(0)
         self.m_input = QSpinBox()
@@ -58,8 +72,10 @@ class ContourEditor(QWidget):
 
         # Layout
         control_layout = QVBoxLayout()
-        control_layout.addWidget(self.btn_reset)
+        control_layout.addWidget(self.slider_scale_thresh)
         control_layout.addWidget(self.slider_scale)
+        control_layout.addWidget(self.slider_scale_epsilon)
+        control_layout.addWidget(self.btn_reset)
         control_layout.addWidget(self.n_input)
         control_layout.addWidget(self.m_input)
         control_layout.addWidget(self.btn_save)
@@ -81,26 +97,37 @@ class ContourEditor(QWidget):
         self.draw_inner_contour(display)
         self.draw_final_offset(display)
         self.draw_final_contour(display)  # Vẽ final_contour lên giao diện
-
-        # Chuyển đổi hình ảnh OpenCV sang QImage
         q_img = self.convert_cv_image_to_qimage(display)
         self.pixmap = QPixmap.fromImage(q_img)
-
-        # Vẽ lại các hình chữ nhật (nếu có) lên QPixmap
         self.draw_rectangles_on_pixmap()
-
-        # Cập nhật QLabel
         self.label.setPixmap(self.pixmap)
-
+    def update_scale_epsilon(self,value):
+        self.scale_epsilon = value
+        if self.selected_contour is not None:
+            self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
+            self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
+        self.update_display()
+    def update_scale_threshol(self, value):
+        self.processor.threshol_editor((value,255))
+        self.contours_template = self.processor.contours_template
+        self.update_display()
+    def update_scale_offset(self, value):
+        """Cập nhật scale factor và vẽ lại contour."""
+        self.scale_factor = value
+        if self.selected_contour is not None:
+            self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
+            self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
+            # self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
+        self.update_display()
     def draw_contours(self, display):
         """Vẽ các contour lên hình ảnh."""
-        cv2.drawContours(display, self.contours_template, -1, (255, 255, 255), 1)
+        cv2.drawContours(display, self.contours_template, -1, (255,255, 0), 1)
 
     def draw_inner_contour(self, display):
         """Vẽ inner contour lên hình ảnh."""
         if self.contour_inner is not None:
-            cv2.drawContours(display, [self.contour_inner[:, :, 0:2]], -1, (0, 0, 255), 2)
-            for i, point in enumerate(self.contour_inner[:, :, 0:2]):
+            cv2.drawContours(display, [self.contour_inner], -1, (0, 0, 255), 2)
+            for i, point in enumerate(self.contour_inner):
                 x, y = point[0]
                 cv2.circle(display, (x, y), 5, (255, 0, 0), -1)
                 cv2.putText(display, str(i), (x + 5, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
@@ -149,15 +176,6 @@ class ContourEditor(QWidget):
         self.contour_selected = False
         self.update_display()
 
-    def update_scale(self, value):
-        """Cập nhật scale factor và vẽ lại contour."""
-        self.scale_factor = value
-        if self.selected_contour is not None:
-            self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
-            self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=1, closed=True)
-            self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
-        self.update_display()
-
     def save_points(self):
         """Lưu các điểm được chọn."""
         if self.contour_inner is not None:
@@ -187,8 +205,8 @@ class ContourEditor(QWidget):
                     if cv2.pointPolygonTest(cnt, (x, y), False) >= 0:
                         self.selected_contour = cnt
                         self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
-                        self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=1, closed=True)
-                        self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
+                        self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
+                        # self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
                         self.contour_selected = True
                         break
             self.update_display()
@@ -234,7 +252,8 @@ class ContourEditor(QWidget):
 
         # Kiểm tra các điểm trong contour_inner có nằm trong vùng bôi đen không
         if self.contour_inner is not None:
-            for point in self.contour_inner[:, :, 0:2]:
+            print(self.contour_inner.shape)
+            for point in self.contour_inner:
                 x, y = point[0]
                 if x1 <= x <= x2 and y1 <= y <= y2:
                     self.temp_masked_points.append((x, y))  # Lưu điểm bị bôi đen

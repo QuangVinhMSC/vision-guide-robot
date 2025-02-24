@@ -7,15 +7,14 @@ class ContourProcessor:
         self.image_path = image_path
         self.template_gray = cv2.imread(image_path, 0)
         self.template_color = cv2.cvtColor(self.template_gray, cv2.COLOR_GRAY2BGR)
-        _, self.template_edges = cv2.threshold(self.template_gray, 90, 255, cv2.THRESH_BINARY)
-        self.contours_template, _ = cv2.findContours(self.template_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+        self.epsilon = 1
+        self.threshol_editor((90,150))
+    def threshol_editor(self, threshol=(90,150)):
+        _, self.template_edges = cv2.threshold(self.template_gray, threshol[0], threshol[1], cv2.THRESH_BINARY)
+        self.contours_template_raw, _ = cv2.findContours(self.template_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)      
         self.min_perimeter = 100
-        self.contours_template = [cv2.approxPolyDP(cnt, epsilon=1, closed=True) for cnt in self.contours_template
+        self.contours_template = [cv2.approxPolyDP(cnt, epsilon=1, closed=True) for cnt in self.contours_template_raw
                                   if cv2.arcLength(cnt, closed=True) > self.min_perimeter]
-
-        print(f'Số lượng contours sau khi lọc: {len(self.contours_template)}')
-
     def shrink_contour(self, contour, scale):
         """ Tạo contour nhỏ hơn dựa trên scale factor """
         M = cv2.moments(contour)
@@ -41,3 +40,7 @@ class ContourProcessor:
         for point in solution:
             offsetted_contour.append([point])
         return np.array(offsetted_contour, dtype=np.int32)
+    def create_vector(self,fst_point,sc_point):
+        pass
+    def translation(self,contour_group):
+        pass
