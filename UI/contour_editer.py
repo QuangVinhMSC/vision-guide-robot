@@ -1,9 +1,11 @@
 import sys
 import cv2
 import numpy as np
-from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QFrame, QSpinBox, QMainWindow
+from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QFrame, QSpinBox, QMainWindow,QTabWidget,QFileDialog,QMessageBox
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtCore import Qt
+from camera_editor import CameraApp
+import os
 
 from contour_algorithm import ContourProcessor  # Import thuật toán
 
@@ -79,7 +81,8 @@ class ContourEditor(QWidget):
         self.zedit_box = QSpinBox()
         self.zedit_box.setRange(-100,100)
         self.zedit_box.valueChanged.connect(self.z_editor)
-
+        self.btn_save_npy = QPushButton("Save Points")
+        self.btn_save_npy.clicked.connect(self.save_numpy)
 
         #connect value
         self.slider_scale_thresh.valueChanged.connect(self.threshol_box.setValue)
@@ -121,6 +124,7 @@ class ContourEditor(QWidget):
         control_layout.addWidget(self.btn_clear)
         control_layout.addLayout(ruler_layout)
         control_layout.addLayout(z_editor)
+        control_layout.addWidget(self.btn_save_npy)
         control_layout.addStretch()
         self.control_panel.setLayout(control_layout)
 
@@ -231,6 +235,37 @@ class ContourEditor(QWidget):
         self.contour_inner = None
         self.contour_selected = False
         self.update_display()
+
+    def save_numpy(self):
+        self.final_contour_3d = np.array(self.final_contour_3d).reshape(len(self.final_contour_3d),1,3)
+        print(self.contour_selected)
+        # Lấy đường dẫn thư mục chứa mã nguồn
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # Thư mục chứa file code
+        template_folder = os.path.join(current_dir, "template")  # Tạo thư mục "template"
+
+        # Tạo thư mục nếu chưa tồn tại
+        if not os.path.exists(template_folder):
+            os.makedirs(template_folder)
+
+        # Định nghĩa đường dẫn file
+        file_path1 = os.path.join(template_folder, "contour_inner.npy")
+        file_path2 = os.path.join(template_folder, "selected_contour.npy")
+
+        # Kiểm tra nếu file đã tồn tại, yêu cầu xác nhận trước khi ghi đè
+        if os.path.exists(file_path1) or os.path.exists(file_path2):
+            reply = QMessageBox.question(self, "Xác nhận",
+                                        f"Có file trùng trong thư mục:\n{file_path1}\n{file_path2}\nBạn có muốn ghi đè không?",
+                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        try:
+            np.save(file_path1, self.final_contour_3d)
+            np.save(file_path2, self.selected_contour)
+
+            QMessageBox.information(self, "Thành công", f"Đã lưu file vào thư mục:\n{template_folder}")
+        except Exception as e:
+            QMessageBox.critical(self, "Lỗi", f"Không thể lưu file: {str(e)}")
+            print("Lỗi khi lưu file:", e)
 
     def save_points(self):
         """Lưu các điểm được chọn."""
@@ -354,12 +389,24 @@ class ContourEditor(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.editor = ContourEditor("/home/vinhdq/vision guide robot/image/captured_image.png")
         self.setWindowTitle("Contour Editor")
         self.resize(1000, 600)
         self.setMinimumSize(800, 400)
-        self.setCentralWidget(self.editor)
+        self.initUI()
+    def initUI(self):
+        tab_widget = QTabWidget()
 
+        # Tạo hai tab
+        
+        self.tab1 = ContourEditor("/home/vinhdq/vision guide robot/image/captured_image.png")
+        self.tab2 = CameraApp()
+        # Layout cho tab 1
+
+        # Thêm tab vào QTabWidget
+        tab_widget.addTab(self.tab1, "Tab 1")
+        tab_widget.addTab(self.tab2, "Tab 2")
+    
+        self.setCentralWidget(tab_widget)
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

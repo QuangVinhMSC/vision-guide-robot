@@ -41,7 +41,3 @@ class ContourProcessor:
         for point in solution:
             offsetted_contour.append([point])
         return np.array(offsetted_contour, dtype=np.int32)
-    def create_vector(self,fst_point,sc_point):
-        pass
-    def translation(self,contour_group):
-        pass
