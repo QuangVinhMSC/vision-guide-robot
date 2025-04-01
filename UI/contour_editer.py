@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QHBoxL
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtCore import Qt
 from camera_editor import CameraApp
+from cam_view import CamView
 import os
 
 from contour_algorithm import ContourProcessor  # Import thuật toán
@@ -50,6 +51,8 @@ class ContourEditor(QWidget):
         self.btn_save.clicked.connect(self.save_points)
         self.btn_clear = QPushButton("Clear Saved")
         self.btn_clear.clicked.connect(self.clear_final_offset)
+        self.cap_a_shot = QPushButton("Capture Image")
+        self.cap_a_shot.clicked.connect(self.capashot)
         self.slider_scale_offset = QSlider(Qt.Horizontal)
         self.slider_scale_offset.setMinimum(-150)
         self.slider_scale_offset.setMaximum(150)
@@ -116,6 +119,7 @@ class ContourEditor(QWidget):
         z_editor.addWidget(self.zedit_box)
         #Panel Layout
         control_layout = QVBoxLayout()
+        control_layout.addWidget(self.cap_a_shot)
         control_layout.addLayout(threshol_layout)
         control_layout.addLayout(offset_layout)
         control_layout.addLayout(epsilon_layout)
@@ -235,7 +239,12 @@ class ContourEditor(QWidget):
         self.contour_inner = None
         self.contour_selected = False
         self.update_display()
-
+    def capashot(self):
+        self.processor.take_a_image()
+        self.template_color = self.processor.template_color
+        self.contours_template = self.processor.contours_template
+        
+        self.update_display()
     def save_numpy(self):
         self.final_contour_3d = np.array(self.final_contour_3d).reshape(len(self.final_contour_3d),1,3)
         print(self.contour_selected)
@@ -397,16 +406,24 @@ class MainWindow(QMainWindow):
         tab_widget = QTabWidget()
 
         # Tạo hai tab
-        
+        self.tab0 = CamView()
         self.tab1 = ContourEditor("/home/vinhdq/vision guide robot/image/captured_image.png")
         self.tab2 = CameraApp()
         # Layout cho tab 1
 
         # Thêm tab vào QTabWidget
+        tab_widget.addTab(self.tab0, "Tab 0")
         tab_widget.addTab(self.tab1, "Tab 1")
         tab_widget.addTab(self.tab2, "Tab 2")
-    
+        tab_widget.currentChanged.connect(self.on_tab_changed)
         self.setCentralWidget(tab_widget)
+    def on_tab_changed(self, index):
+        self.pr_index = 0
+        if self.pr_index == 0:  # Tab 2 được chọn
+            self.tab0.close_app()
+        if index == 0:
+            self.tab0.restart_camera()
+        self.pr_index = index
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

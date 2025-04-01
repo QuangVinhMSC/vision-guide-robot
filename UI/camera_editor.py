@@ -4,7 +4,7 @@ import numpy as np
 from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QSizePolicy
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtCore import Qt
-from camera import ContourMatcher
+from camera import ContourDetector
 
 
 class CameraApp(QWidget):
@@ -57,7 +57,7 @@ class CameraApp(QWidget):
                 print("Không tìm thấy hai file .npy trong thư mục đã chọn.")
                 return
             
-            self.matcher = ContourMatcher(file1, file2)
+            self.matcher = ContourDetector(file1, file2)
             self.button.setEnabled(True)
 
     def run_detection(self):
@@ -66,36 +66,36 @@ class CameraApp(QWidget):
             return
 
         gray = self.matcher.capture_single_shot()
-        try:
-            cnt_inner, cnt_image, best_contour, best_iou, best_iou_translation, best_iou_size, processing_time = self.matcher.contour_detection(gray)
+        # try:
+        cnt_inner, cnt_image, best_contour, best_iou, best_iou_translation, best_iou_size, processing_time = self.matcher.contour_detection(gray)
 
-            # Vẽ kết quả lên ảnh gốc
-            cv2.drawContours(gray, [cnt_inner[:, :, 0:2]], -1, (0, 255, 0), 2)
-            cv2.drawContours(gray, [cnt_image], -1, (0, 255, 0), 2)
-            cv2.drawContours(gray, [best_contour], -1, (255, 0, 0), 2)
-            cv2.putText(gray, f'IoU Rotation: {best_iou:.4f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-            cv2.putText(gray, f'IoU Translation: {best_iou_translation:.4f}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-            cv2.putText(gray, f'IoU Size: {best_iou_size:.4f}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-            cv2.putText(gray, f'Latency: {processing_time:.4f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Vẽ kết quả lên ảnh gốc
+        cv2.drawContours(gray, [cnt_inner[:, :, 0:2]], -1, (0, 255, 0), 2)
+        cv2.drawContours(gray, [cnt_image], -1, (0, 255, 0), 2)
+        cv2.drawContours(gray, [best_contour], -1, (255, 0, 0), 2)
+        cv2.putText(gray, f'IoU Rotation: {best_iou:.4f}', (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(gray, f'IoU Translation: {best_iou_translation:.4f}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(gray, f'IoU Size: {best_iou_size:.4f}', (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.putText(gray, f'Latency: {processing_time:.4f}', (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-            # Chuyển ảnh từ OpenCV sang QImage để hiển thị
-            height, width = gray.shape
-            q_image = QImage(gray.data, width, height, width, QImage.Format_Grayscale8)
+        # Chuyển ảnh từ OpenCV sang QImage để hiển thị
+        height, width = gray.shape
+        q_image = QImage(gray.data, width, height, width, QImage.Format_Grayscale8)
 
-            # Tạo QPixmap từ QImage
-            pixmap = QPixmap.fromImage(q_image)
+        # Tạo QPixmap từ QImage
+        pixmap = QPixmap.fromImage(q_image)
 
-            # Lấy kích thước QLabel
-            label_width = self.image_label.width()
-            label_height = self.image_label.height()
+        # Lấy kích thước QLabel
+        label_width = self.image_label.width()
+        label_height = self.image_label.height()
 
-            # Resize ảnh nhưng giữ đúng tỷ lệ
-            pixmap = pixmap.scaled(label_width, label_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        # Resize ảnh nhưng giữ đúng tỷ lệ
+        pixmap = pixmap.scaled(label_width, label_height, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-            self.image_label.setPixmap(pixmap)
-        except:
-            print("ko co contour")
-            pass
+        self.image_label.setPixmap(pixmap)
+        # except:
+        #     print("ko co contour")
+        #     pass
 
 
 if __name__ == "__main__":

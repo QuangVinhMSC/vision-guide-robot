@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import pyclipper
+from camera import ContourDetector
 
 class ContourProcessor:
     def __init__(self, image_path):
@@ -9,6 +10,11 @@ class ContourProcessor:
         self.template_color = cv2.cvtColor(self.template_gray, cv2.COLOR_GRAY2BGR)
         self.epsilon = 1
         self.threshol_editor((90,150))
+    def take_a_image(self):
+        self.matcher = ContourDetector()
+        self.template_gray = self.matcher.capture_single_shot()
+        self.template_color = cv2.cvtColor(self.template_gray, cv2.COLOR_GRAY2BGR)
+        self.matcher.rm_camera()
     def threshol_editor(self, threshol=(90,150)):
         _, self.template_edges = cv2.threshold(self.template_gray, threshol[0], threshol[1], cv2.THRESH_BINARY)
         self.contours_template_raw, _ = cv2.findContours(self.template_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)      
