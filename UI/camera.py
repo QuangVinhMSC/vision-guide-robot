@@ -28,16 +28,21 @@ class ContourDetector:
     def capture_single_shot(self):
         # Start capturing a single image
         self.camera.StartGrabbing(1)  # Capture only one image
-        converter = pylon.ImageFormatConverter()
-        converter.OutputPixelFormat = pylon.PixelType_Mono8
-        converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
+        self.converter = pylon.ImageFormatConverter()
+        self.converter.OutputPixelFormat = pylon.PixelType_Mono8
+        self.converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
         grabResult = self.camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
-        image = converter.Convert(grabResult)
+        image = self.converter.Convert(grabResult)
         img = image.GetArray()
         self.camera.StopGrabbing()
         return img
-
+    def grabbing(self):
+        self.camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
+        grabResult = self.camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException)
+        image = self.converter.Convert(grabResult)
+        img = image.GetArray()
+        return img
     def compute_iou(self, contour1, contour2, shape):
         mask1 = np.zeros(shape, dtype=np.uint8)
         mask2 = np.zeros(shape, dtype=np.uint8)
@@ -76,12 +81,19 @@ class ContourDetector:
             c = b - (b - a) * gr
             d = a + (b - a) * gr
         best_angle = (a + b) / 2
+        best_angle_inv = best_angle + 180
         best_contour = self.rotate_contour(cnt_template_scaled, best_angle, (cx_image, cy_image))
+        best_contour_inv = self.rotate_contour(cnt_template_scaled, best_angle_inv, (cx_image, cy_image))
         best_iou = self.compute_iou(best_contour, cnt_image, image_shape[:2])
+        best_iou_inv = self.compute_iou(best_contour_inv, cnt_image, image_shape[:2])
+        if best_iou_inv > best_iou:
+            print("inv",best_iou_inv)
+            print("bes",best_iou)
+            return best_angle_inv,best_iou_inv,best_contour_inv
         return best_angle, best_iou, best_contour
 
-    def contour_detection(self, gray):
-        _, image_edges = cv2.threshold(gray, 110, 255, cv2.THRESH_BINARY)
+    def contour_detection(self, gray,thr = 100):
+        _, image_edges = cv2.threshold(gray, thr, 255, cv2.THRESH_BINARY)
         contours_image, _ = cv2.findContours(image_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         start_time = time.time()
 

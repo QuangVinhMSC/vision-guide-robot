@@ -7,6 +7,9 @@ from PySide6.QtCore import Qt
 from camera_editor import CameraApp
 from cam_view import CamView
 import os
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
+                              QHBoxLayout, QLabel, QSpinBox, 
+                              QScrollArea, QGridLayout)
 
 from contour_algorithm import ContourProcessor  # Import thuật toán
 
@@ -129,6 +132,40 @@ class ContourEditor(QWidget):
         control_layout.addLayout(ruler_layout)
         control_layout.addLayout(z_editor)
         control_layout.addWidget(self.btn_save_npy)
+        self.box_display_widget = QWidget()
+        box_layout = QVBoxLayout()
+        
+        # Control để thay đổi số hàng
+        self.box_row_control = QSpinBox()
+        self.box_row_control.setRange(1, 10)  # Tối đa 10 hàng
+        self.box_row_control.setValue(3)      # Mặc định 3 hàng
+        
+        # Khu vực hiển thị các box (dùng QScrollArea nếu nhiều hàng)
+        self.box_scroll = QScrollArea()
+        self.box_scroll.setWidgetResizable(True)
+        
+        # Widget chứa các box thực tế
+        self.box_container = BoxContainerWidget()
+        self.box_row_control.valueChanged.connect(self.box_container.update_rows)
+        
+        self.box_scroll.setWidget(self.box_container)
+        
+        # Nút để lấy giá trị từ các box
+        self.btn_get_box_values = QPushButton("Lấy giá trị box")
+        self.btn_get_box_values.clicked.connect(self.get_box_values)
+        
+        # Thêm vào layout
+        box_layout.addWidget(QLabel("Số hàng box:"))
+        box_layout.addWidget(self.box_row_control)
+        box_layout.addWidget(self.box_scroll)
+        box_layout.addWidget(self.btn_get_box_values)
+        
+        self.box_display_widget.setLayout(box_layout)
+        # ===== KẾT THÚC PHẦN THÊM =====
+        
+        # Thêm vào control panel
+        control_layout.addWidget(self.box_display_widget)
+        control_layout.addStretch()
         control_layout.addStretch()
         self.control_panel.setLayout(control_layout)
 
@@ -394,7 +431,54 @@ class ContourEditor(QWidget):
 
         painter.end()
         self.label.setPixmap(pixmap)
-
+    # Thêm phương thức để lấy giá trị từ các box
+    def get_box_values(self):
+        values = []
+        for i, row in enumerate(self.box_container.rows):
+            label = row[0].text()
+            val1 = row[1].value()
+            val2 = row[2].value()
+            values.append(f"{label}: {val1}, {val2}")
+        
+        # Hiển thị giá trị (có thể thay đổi theo nhu cầu)
+        QMessageBox.information(self, "Giá trị box", "\n".join(values))
+class BoxContainerWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.grid = QGridLayout(self)
+        self.grid.setSpacing(5)
+        self.rows = []
+        
+    def update_rows(self, row_count):
+        # Xóa các hàng cũ
+        for row in self.rows:
+            for widget in row:
+                self.grid.removeWidget(widget)
+                widget.deleteLater()
+        self.rows = []
+        
+        # Thêm hàng mới (mỗi hàng 3 box)
+        for i in range(row_count):
+            row_widgets = [
+                QLabel(f"Hàng {i+1}"),
+                QSpinBox(),
+                QSpinBox()
+            ]
+            
+            # Style cho các widget
+            row_widgets[0].setStyleSheet("background: #3498db; color: white; padding: 5px;")
+            row_widgets[1].setStyleSheet("background: #e74c3c; color: white;")
+            row_widgets[2].setStyleSheet("background: #2ecc71; color: white;")
+            
+            # Đặt giá trị mặc định
+            row_widgets[1].setValue((i+1)*10)
+            row_widgets[2].setValue((i+1)*20)
+            
+            # Thêm vào layout
+            for col, widget in enumerate(row_widgets):
+                self.grid.addWidget(widget, i, col)
+            
+            self.rows.append(row_widgets)
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -424,6 +508,7 @@ class MainWindow(QMainWindow):
         if index == 0:
             self.tab0.restart_camera()
         self.pr_index = index
+        self.tab2.thr = self.tab1.slider_scale_thresh.value()
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

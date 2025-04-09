@@ -3,16 +3,15 @@ import cv2
 import numpy as np
 from PySide6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QSizePolicy
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt,Signal
 from camera import ContourDetector
-
 
 class CameraApp(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
         self.matcher = None
-
+        self.thr = None
     def initUI(self):
         self.setWindowTitle("Contour Detection")
         self.setGeometry(100, 100, 1000, 600)
@@ -67,7 +66,7 @@ class CameraApp(QWidget):
 
         gray = self.matcher.capture_single_shot()
         # try:
-        cnt_inner, cnt_image, best_contour, best_iou, best_iou_translation, best_iou_size, processing_time = self.matcher.contour_detection(gray)
+        cnt_inner, cnt_image, best_contour, best_iou, best_iou_translation, best_iou_size, processing_time = self.matcher.contour_detection(gray,self.thr)
 
         # Vẽ kết quả lên ảnh gốc
         cv2.drawContours(gray, [cnt_inner[:, :, 0:2]], -1, (0, 255, 0), 2)
