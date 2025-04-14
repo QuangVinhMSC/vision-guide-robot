@@ -1,15 +1,15 @@
 import sys
 import cv2
 import numpy as np
-from PySide6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QFrame, QSpinBox, QMainWindow,QTabWidget,QFileDialog,QMessageBox
+from PySide6.QtWidgets import (QApplication, QLabel, QWidget, QVBoxLayout, QHBoxLayout, 
+                              QPushButton, QSlider, QFrame, QSpinBox, QMainWindow, 
+                              QTabWidget, QFileDialog, QMessageBox, QScrollArea, QGridLayout)
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtCore import Qt
 from camera_editor import CameraApp
 from cam_view import CamView
 import os
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                              QHBoxLayout, QLabel, QSpinBox, 
-                              QScrollArea, QGridLayout)
+from PySide6.QtCore import Signal
 
 from contour_algorithm import ContourProcessor  # Import thuật toán
 
@@ -25,7 +25,6 @@ class ContourEditor(QWidget):
         self.end_pos = None
         self.selected_contour = None
         self.contour_inner = None
-        self.selected_point_idx = None
         self.contour_selected = False
         self.scale_factor = 0.8
         self.scale_epsilon = 1
@@ -50,12 +49,11 @@ class ContourEditor(QWidget):
         # Buttons, Slider, and SpinBox
         self.btn_reset = QPushButton("Reset Contour")
         self.btn_reset.clicked.connect(self.reset_selection)
-        self.btn_save = QPushButton("Save Points")
-        self.btn_save.clicked.connect(self.save_points)
-        self.btn_clear = QPushButton("Clear Saved")
-        self.btn_clear.clicked.connect(self.clear_final_offset)
         self.cap_a_shot = QPushButton("Capture Image")
         self.cap_a_shot.clicked.connect(self.capashot)
+        self.btn_update = QPushButton("Cập nhật điểm")  # Thêm nút cập nhật
+        self.btn_update.clicked.connect(self.update_box_container)  # Kết nối sự kiện
+        
         self.slider_scale_offset = QSlider(Qt.Horizontal)
         self.slider_scale_offset.setMinimum(-150)
         self.slider_scale_offset.setMaximum(150)
@@ -71,7 +69,7 @@ class ContourEditor(QWidget):
         self.slider_scale_thresh.valueChanged.connect(self.update_scale_threshol)
         self.slider_scale_epsilon = QSlider(Qt.Horizontal)
         self.slider_scale_epsilon.setMinimum(1)
-        self.slider_scale_epsilon.setMaximum(10)
+        self.slider_scale_epsilon.setMaximum(150)
         self.slider_scale_epsilon.setTickInterval(1)
         self.slider_scale_epsilon.setTickPosition(QSlider.TicksBelow)
         self.slider_scale_epsilon.valueChanged.connect(self.update_scale_epsilon)
@@ -80,13 +78,7 @@ class ContourEditor(QWidget):
         self.offset_box = QSpinBox()
         self.offset_box.setRange(-150, 150)
         self.epsilon_box = QSpinBox()
-        self.epsilon_box.setRange(1, 10)
-        self.point_box = QSpinBox()
-        self.point_box.setRange(0,0)
-        self.point_box.valueChanged.connect(self.select_point2edit)
-        self.zedit_box = QSpinBox()
-        self.zedit_box.setRange(-100,100)
-        self.zedit_box.valueChanged.connect(self.z_editor)
+        self.epsilon_box.setRange(1, 150)
         self.btn_save_npy = QPushButton("Save Points")
         self.btn_save_npy.clicked.connect(self.save_numpy)
 
@@ -117,9 +109,6 @@ class ContourEditor(QWidget):
         ruler_layout.addWidget(self.ruler_x)
         ruler_layout.addWidget(self.ruler_y)
         ruler_layout.addWidget(self.ruler_diag)
-        z_editor = QHBoxLayout()
-        z_editor.addWidget(self.point_box)
-        z_editor.addWidget(self.zedit_box)
         #Panel Layout
         control_layout = QVBoxLayout()
         control_layout.addWidget(self.cap_a_shot)
@@ -127,45 +116,20 @@ class ContourEditor(QWidget):
         control_layout.addLayout(offset_layout)
         control_layout.addLayout(epsilon_layout)
         control_layout.addWidget(self.btn_reset)
-        control_layout.addWidget(self.btn_save)
-        control_layout.addWidget(self.btn_clear)
+        control_layout.addWidget(self.btn_update)  # Thêm nút cập nhật vào layout
         control_layout.addLayout(ruler_layout)
-        control_layout.addLayout(z_editor)
         control_layout.addWidget(self.btn_save_npy)
-        self.box_display_widget = QWidget()
-        box_layout = QVBoxLayout()
         
-        # Control để thay đổi số hàng
-        self.box_row_control = QSpinBox()
-        self.box_row_control.setRange(1, 10)  # Tối đa 10 hàng
-        self.box_row_control.setValue(3)      # Mặc định 3 hàng
-        
-        # Khu vực hiển thị các box (dùng QScrollArea nếu nhiều hàng)
+        # Khu vực hiển thị các box (dùng QScrollArea)
         self.box_scroll = QScrollArea()
         self.box_scroll.setWidgetResizable(True)
         
         # Widget chứa các box thực tế
         self.box_container = BoxContainerWidget()
-        self.box_row_control.valueChanged.connect(self.box_container.update_rows)
-        
         self.box_scroll.setWidget(self.box_container)
-        
-        # Nút để lấy giá trị từ các box
-        self.btn_get_box_values = QPushButton("Lấy giá trị box")
-        self.btn_get_box_values.clicked.connect(self.get_box_values)
-        
-        # Thêm vào layout
-        box_layout.addWidget(QLabel("Số hàng box:"))
-        box_layout.addWidget(self.box_row_control)
-        box_layout.addWidget(self.box_scroll)
-        box_layout.addWidget(self.btn_get_box_values)
-        
-        self.box_display_widget.setLayout(box_layout)
-        # ===== KẾT THÚC PHẦN THÊM =====
-        
+        self.box_container.spinbox_value_changed.connect(self.method_to_run_on_spinbox_change)
         # Thêm vào control panel
-        control_layout.addWidget(self.box_display_widget)
-        control_layout.addStretch()
+        control_layout.addWidget(self.box_scroll)
         control_layout.addStretch()
         self.control_panel.setLayout(control_layout)
 
@@ -175,7 +139,24 @@ class ContourEditor(QWidget):
 
         self.setLayout(main_layout)
         self.update_display()
+        
+    def method_to_run_on_spinbox_change(self, idx, value):
+        """Phương thức bạn tự xây dựng để xử lý khi giá trị trong SpinBox cột 1 thay đổi."""
+        # Xử lý logic tại đây
+        print(f"Giá trị SpinBox tại cột {idx} đã thay đổi: {value}")
+        # (Tùy vào yêu cầu, bạn có thể cập nhật các giá trị khác hoặc tính toán gì đó)
+        # Ví dụ: cập nhật giá trị vào final_contour_3d hoặc làm gì đó liên quan đến dữ liệu.
+        self.contour_inner = self.processor.calculate_offset(self.selected_contour, self.sim_contour, -self.scale_factor, point=idx, individual_offset= -value)
+        self.update_display()
 
+    def update_box_spinboxes(self):
+        """Cập nhật toàn bộ spinbox dựa theo scale factor hiện tại."""
+        if self.box_container and self.box_container.rows:
+            for i, (label, spinbox1, spinbox2) in enumerate(self.box_container.rows):
+                # Set giá trị cho SpinBox thứ 1 (cột 1) theo giá trị scale_factor
+                spinbox1.blockSignals(True)  # Chặn tín hiệu valueChanged trong lúc set
+                spinbox1.setValue(self.scale_factor)  # Đồng bộ với scale_factor
+                spinbox1.blockSignals(False)  # Mở lại tín hiệu
     def update_display(self):
         """Cập nhật hình ảnh hiển thị trên QLabel."""
         display = self.template_color.copy()
@@ -191,39 +172,66 @@ class ContourEditor(QWidget):
         self.pixmap = QPixmap.fromImage(q_img)
         self.draw_rectangles_on_pixmap()
         self.label.setPixmap(self.pixmap)
+        
+    def update_box_container(self):
+        """Cập nhật box container dựa trên các điểm trong contour_inner khi nhấn nút."""
+        if self.contour_inner is not None:
+            self.box_container.update_rows(len(self.contour_inner))
+            
+            for i, point in enumerate(self.contour_inner):
+                x, y = point[0]
+                # Giá trị offset mặc định là scale_factor
+                offset_value = self.scale_factor
+
+                if i < len(self.final_contour_3d):
+                    offset_value = self.final_contour_3d[i][2]
+
+                # Cập nhật giá trị cho SpinBox
+                spinbox = self.box_container.rows[i][1]
+                spinbox.blockSignals(True)  # Chặn tín hiệu valueChanged trong lúc set
+                spinbox.setValue(offset_value)
+                spinbox.blockSignals(False)
+                
+                # Kết nối signal valueChanged
+                spinbox.valueChanged.connect(
+                    lambda value, idx=i: self.update_point_offset(idx, value)
+                )
+
+
+    def update_point_offset(self, point_idx, offset_value):
+        """Cập nhật giá trị offset cho điểm được chọn."""
+        if point_idx < len(self.final_contour_3d):
+            self.final_contour_3d[point_idx][2] = offset_value
+            self.update_display()
+
     def update_scale_epsilon(self,value):
         self.scale_epsilon = value
         if self.selected_contour is not None:
-            self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
-            self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
+            self.sim_contour = self.processor.simplify_contour_min_distance(self.selected_contour, self.scale_epsilon)
+            self.contour_inner = self.processor.calculate_offset(self.selected_contour,self.sim_contour, -self.scale_factor)
         self.update_display()
+
     def update_scale_threshol(self, value):
         self.processor.threshol_editor((value,255))
         self.contours_template = self.processor.contours_template
         self.update_display()
+
     def update_scale_offset(self, value):
         """Cập nhật scale factor và vẽ lại contour."""
         self.scale_factor = value
         if self.selected_contour is not None:
-            self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
-            self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
-            # self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
+            self.contour_inner = self.processor.calculate_offset(self.selected_contour, self.sim_contour, -self.scale_factor)
+        self.update_box_spinboxes()  # Đồng bộ lại các SpinBox trong BoxContainer với scale_factor mới
         self.update_display()
+
     def draw_point(self,display):
         x, y = self.final_contour[self.point_box.value()]
         cv2.circle(display, (x, y), 8, (100, 0, 255), -1)  # Màu khác để phân biệt
+
     def draw_contours(self, display):
         """Vẽ các contour lên hình ảnh."""
         cv2.drawContours(display, self.contours_template, -1, (255,255, 0), 3)
-    def select_point2edit(self):
-        self.zedit_box.setValue(self.final_contour_3d[self.point_box.value()][2])
-        self.update_display()
-    def z_editor(self):
-        try:
-            self.final_contour_3d[self.point_box.value()][2] = self.zedit_box.value()
-            print(self.final_contour_3d[self.point_box.value()])
-        except:
-            pass
+
     def draw_inner_contour(self, display):
         """Vẽ inner contour lên hình ảnh."""
         if self.contour_inner is not None:
@@ -269,69 +277,61 @@ class ContourEditor(QWidget):
                             self.end_pos.x() - self.start_pos.x(),
                             self.end_pos.y() - self.start_pos.y())
             painter.end()
-
     def reset_selection(self):
-        """Reset các lựa chọn contour."""
+        """Reset các lựa chọn contour và BoxContainer."""
         self.selected_contour = None
         self.contour_inner = None
         self.contour_selected = False
-        self.update_display()
+        self.final_contour = []
+        self.final_contour_3d = []
+        self.temp_masked_points = []  # Xóa danh sách điểm tạm thời
+        self.box_container.update_rows(0)  # Reset BoxContainer (xóa hết các hàng)
+        self.update_display()  # Cập nhật lại giao diện
+
     def capashot(self):
         self.processor.take_a_image()
         self.template_color = self.processor.template_color
         self.contours_template = self.processor.contours_template
-        
         self.update_display()
+            
     def save_numpy(self):
-        self.final_contour_3d = np.array(self.final_contour_3d).reshape(len(self.final_contour_3d),1,3)
-        print(self.contour_selected)
-        # Lấy đường dẫn thư mục chứa mã nguồn
-        current_dir = os.path.dirname(os.path.abspath(__file__))  # Thư mục chứa file code
-        template_folder = os.path.join(current_dir, "template")  # Tạo thư mục "template"
-
-        # Tạo thư mục nếu chưa tồn tại
-        if not os.path.exists(template_folder):
-            os.makedirs(template_folder)
-
-        # Định nghĩa đường dẫn file
-        file_path1 = os.path.join(template_folder, "contour_inner.npy")
-        file_path2 = os.path.join(template_folder, "selected_contour.npy")
-
-        # Kiểm tra nếu file đã tồn tại, yêu cầu xác nhận trước khi ghi đè
-        if os.path.exists(file_path1) or os.path.exists(file_path2):
-            reply = QMessageBox.question(self, "Xác nhận",
-                                        f"Có file trùng trong thư mục:\n{file_path1}\n{file_path2}\nBạn có muốn ghi đè không?",
-                                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if reply == QMessageBox.No:
-                return
-        try:
-            np.save(file_path1, self.final_contour_3d)
-            np.save(file_path2, self.selected_contour)
-
-            QMessageBox.information(self, "Thành công", f"Đã lưu file vào thư mục:\n{template_folder}")
-        except Exception as e:
-            QMessageBox.critical(self, "Lỗi", f"Không thể lưu file: {str(e)}")
-            print("Lỗi khi lưu file:", e)
-
-    def save_points(self):
-        """Lưu các điểm được chọn."""
+        """Lưu trực tiếp các điểm trong contour_inner vào file numpy với shape (N,1,3)."""
         if self.contour_inner is not None:
-            # Thêm các điểm tạm thời bị bôi đen vào final_contour
-            self.final_contour.extend(self.temp_masked_points)
-            self.final_contour_3d.extend([[x, y, 0] for x, y in self.temp_masked_points])
-            
-            self.temp_masked_points = []  # Xóa danh sách tạm thời
-            self.point_box.setRange(0,len(self.final_contour)-1)
-            
-            self.update_display()
+            # Tạo một mảng numpy mới có shape (N, 1, 3)
+            contour_with_value = []
 
-    def clear_final_offset(self):
-        """Xóa các điểm đã lưu."""
-        self.final_offset = []
-        self.final_contour = []
-        self.final_contour_3d = []
-        self.point_box.setRange(0,len(self.final_contour))
-        self.update_display()
+            for i, point in enumerate(self.contour_inner):
+                x, y = point[0]
+                extra_value = self.box_container.rows[i][2].value()  # Lấy giá trị từ SpinBox thứ 2 (cột thêm)
+                contour_with_value.append([[x, y, extra_value]])
+
+            contour_with_value = np.array(contour_with_value, dtype=np.float32)  # Ép kiểu float32 cho chuẩn
+
+            # Save vào file .npy
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            template_folder = os.path.join(current_dir, "template")
+
+            if not os.path.exists(template_folder):
+                os.makedirs(template_folder)
+
+            file_path1 = os.path.join(template_folder, "contour_inner.npy")
+            file_path2 = os.path.join(template_folder, "selected_contour.npy")
+
+            if os.path.exists(file_path1) or os.path.exists(file_path2):
+                reply = QMessageBox.question(self, "Xác nhận",
+                                            f"Có file trùng trong thư mục:\n{file_path1}\n{file_path2}\nBạn có muốn ghi đè không?",
+                                            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if reply == QMessageBox.No:
+                    return
+            try:
+                np.save(file_path1, contour_with_value)  # Đây! Lưu đúng shape (N,1,3)
+                np.save(file_path2, self.selected_contour)
+
+                QMessageBox.information(self, "Thành công", f"Đã lưu file vào thư mục:\n{template_folder}")
+            except Exception as e:
+                QMessageBox.critical(self, "Lỗi", f"Không thể lưu file: {str(e)}")
+                print("Lỗi khi lưu file:", e)
+
 
     def mouseDoubleClickEvent(self, event):
         """Xử lý sự kiện double click chuột."""
@@ -347,12 +347,12 @@ class ContourEditor(QWidget):
                 for cnt in self.contours_template:
                     if cv2.pointPolygonTest(cnt, (x, y), False) >= 0:
                         self.selected_contour = cnt
-                        self.contour_inner = self.processor.contour_offset(self.selected_contour, -self.scale_factor)
-                        self.contour_inner = cv2.approxPolyDP(self.contour_inner, epsilon=self.scale_epsilon, closed=True)
-                        # self.contour_inner = np.concatenate((self.contour_inner, np.zeros((self.contour_inner.shape[0], 1, 1), dtype=self.contour_inner.dtype)), axis=2)
+                        self.sim_contour = self.processor.simplify_contour_min_distance(self.selected_contour,self.scale_epsilon)
+                        self.contour_inner = self.processor.calculate_offset(self.selected_contour,self.sim_contour, -self.scale_factor)
                         self.contour_selected = True
                         break
             self.update_display()
+
     def mousePressEvent(self, event):
         """Xử lý sự kiện nhấn chuột."""
         self.start_pos = event.position().toPoint()
@@ -394,6 +394,7 @@ class ContourEditor(QWidget):
         self.ruler_x.setText(f"{abs(x1-x2)}")
         self.ruler_y.setText(f"{abs(y1-y2)}")
         self.ruler_diag.setText(f"{int(np.sqrt((x1-x2)**2+(y1-y2)**2))}")
+
         # Kiểm tra các điểm trong contour_inner có nằm trong vùng bôi đen không
         if self.contour_inner is not None:
             print(self.contour_inner.shape)
@@ -431,54 +432,57 @@ class ContourEditor(QWidget):
 
         painter.end()
         self.label.setPixmap(pixmap)
-    # Thêm phương thức để lấy giá trị từ các box
-    def get_box_values(self):
-        values = []
-        for i, row in enumerate(self.box_container.rows):
-            label = row[0].text()
-            val1 = row[1].value()
-            val2 = row[2].value()
-            values.append(f"{label}: {val1}, {val2}")
-        
-        # Hiển thị giá trị (có thể thay đổi theo nhu cầu)
-        QMessageBox.information(self, "Giá trị box", "\n".join(values))
+
+
 class BoxContainerWidget(QWidget):
+    # Tạo tín hiệu khi giá trị SpinBox thay đổi
+    spinbox_value_changed = Signal(int, int)  # Tín hiệu truyền index và giá trị mới
+
     def __init__(self):
         super().__init__()
         self.grid = QGridLayout(self)
         self.grid.setSpacing(5)
         self.rows = []
-        
+
     def update_rows(self, row_count):
+        """Cập nhật lại số lượng hàng trong BoxContainer và reset giá trị."""
         # Xóa các hàng cũ
         for row in self.rows:
             for widget in row:
                 self.grid.removeWidget(widget)
                 widget.deleteLater()
         self.rows = []
-        
-        # Thêm hàng mới (mỗi hàng 3 box)
+
+        # Thêm hàng mới (mỗi hàng gồm label, spinbox 1, spinbox 2)
         for i in range(row_count):
             row_widgets = [
-                QLabel(f"Hàng {i+1}"),
+                QLabel(f"{i}"),
                 QSpinBox(),
-                QSpinBox()
+                QSpinBox()  # Cột thêm (spinbox thứ 2)
             ]
             
             # Style cho các widget
             row_widgets[0].setStyleSheet("background: #3498db; color: white; padding: 5px;")
             row_widgets[1].setStyleSheet("background: #e74c3c; color: white;")
-            row_widgets[2].setStyleSheet("background: #2ecc71; color: white;")
+            row_widgets[2].setStyleSheet("background: #e74c3c; color: white;")  # Style cho cột thêm
             
-            # Đặt giá trị mặc định
-            row_widgets[1].setValue((i+1)*10)
-            row_widgets[2].setValue((i+1)*20)
+            row_widgets[1].setRange(-200, 200)  # Giới hạn giá trị offset
+            row_widgets[2].setRange(-200, 200)  # Cột thêm có giới hạn tương tự
+
+            # Lắng nghe sự thay đổi của SpinBox thứ nhất (cột thứ 1)
+            row_widgets[1].valueChanged.connect(
+                lambda value, idx=i: self.spinbox_value_changed.emit(idx, value)  # Phát tín hiệu khi giá trị thay đổi
+            )
             
             # Thêm vào layout
-            for col, widget in enumerate(row_widgets):
-                self.grid.addWidget(widget, i, col)
-            
+            self.grid.addWidget(row_widgets[0], i, 0)
+            self.grid.addWidget(row_widgets[1], i, 1)
+            self.grid.addWidget(row_widgets[2], i, 2)  # Thêm cột mới
+
             self.rows.append(row_widgets)
+
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -486,6 +490,7 @@ class MainWindow(QMainWindow):
         self.resize(1000, 600)
         self.setMinimumSize(800, 400)
         self.initUI()
+
     def initUI(self):
         tab_widget = QTabWidget()
 
@@ -493,7 +498,6 @@ class MainWindow(QMainWindow):
         self.tab0 = CamView()
         self.tab1 = ContourEditor("/home/vinhdq/vision guide robot/image/captured_image.png")
         self.tab2 = CameraApp()
-        # Layout cho tab 1
 
         # Thêm tab vào QTabWidget
         tab_widget.addTab(self.tab0, "Tab 0")
@@ -501,6 +505,7 @@ class MainWindow(QMainWindow):
         tab_widget.addTab(self.tab2, "Tab 2")
         tab_widget.currentChanged.connect(self.on_tab_changed)
         self.setCentralWidget(tab_widget)
+
     def on_tab_changed(self, index):
         self.pr_index = 0
         if self.pr_index == 0:  # Tab 2 được chọn
@@ -509,6 +514,7 @@ class MainWindow(QMainWindow):
             self.tab0.restart_camera()
         self.pr_index = index
         self.tab2.thr = self.tab1.slider_scale_thresh.value()
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
